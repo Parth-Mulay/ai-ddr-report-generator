@@ -1,0 +1,24 @@
+# Sensitive files
+.env
+
+# Uploads and temporary directories
+uploads/
+reports/
+temp_images/
+test_temp_images/
+
+# Python caching
+__pycache__/
+*.pyc
+
+# IDE files
+.vscode/
+.idea/
+
+# Local testing artifacts
+generate_samples.py
+test_pipeline.py
+test_key.py
+mock_ddr.pdf
+inspection_report.pdf
+thermal_report.pdf

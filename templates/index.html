@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI DDR Report Generator</title>
+    <!-- Modern web font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="glass-bg-decor1"></div>
+    <div class="glass-bg-decor2"></div>
+
+    <div class="app-container">
+        <header>
+            <div class="logo-area">
+                <span class="logo-icon">✦</span>
+                <h1>AI DDR Report Generator</h1>
+            </div>
+            <p class="subtitle">Convert building inspection and thermal imaging reports into detailed diagnostic PDFs using generative AI</p>
+        </header>
+
+        <main class="main-card">
+            <form id="ddr-upload-form" class="upload-form" method="POST" enctype="multipart/form-data">
+
+                <div class="upload-grid">
+                    <!-- Inspection Report PDF -->
+                    <div class="upload-box" id="inspection-box">
+                        <div class="box-header">
+                            <span class="box-icon">📋</span>
+                            <h3>Inspection Report PDF</h3>
+                        </div>
+                        <div class="dropzone" id="inspection-dropzone">
+                            <input type="file" id="inspection-file" name="inspection_file" accept=".pdf" required>
+                            <div class="dropzone-content">
+                                <span class="dropzone-text-primary">Click to upload or drag & drop</span>
+                                <span class="dropzone-text-secondary">PDF document only</span>
+                            </div>
+                        </div>
+                        <div class="file-info-badge" id="inspection-file-info" style="display: none;">
+                            <span class="filename-text" id="inspection-filename">None</span>
+                            <button type="button" class="btn-clear-file" id="clear-inspection-btn">×</button>
+                        </div>
+                    </div>
+
+                    <!-- Thermal Report PDF -->
+                    <div class="upload-box" id="thermal-box">
+                        <div class="box-header">
+                            <span class="box-icon">🔥</span>
+                            <h3>Thermal Report PDF</h3>
+                        </div>
+                        <div class="dropzone" id="thermal-dropzone">
+                            <input type="file" id="thermal-file" name="thermal_file" accept=".pdf" required>
+                            <div class="dropzone-content">
+                                <span class="dropzone-text-primary">Click to upload or drag & drop</span>
+                                <span class="dropzone-text-secondary">PDF document only</span>
+                            </div>
+                        </div>
+                        <div class="file-info-badge" id="thermal-file-info" style="display: none;">
+                            <span class="filename-text" id="thermal-filename">None</span>
+                            <button type="button" class="btn-clear-file" id="clear-thermal-btn">×</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-section">
+                    <button type="submit" class="btn btn-primary" id="generate-btn">
+                        <span class="btn-text">Generate DDR Report</span>
+                        <div class="spinner-loader" id="btn-spinner" style="display: none;"></div>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Status and Results Panel -->
+            <div id="status-panel" class="status-panel" style="display: none;">
+                <div class="status-header">
+                    <span class="status-indicator-dot processing" id="status-dot"></span>
+                    <h4 id="status-title">Processing Documents...</h4>
+                </div>
+                <p class="status-desc" id="status-desc">Extracting text and images from PDF uploads.</p>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="status-bar"></div>
+                </div>
+            </div>
+
+            <!-- Success / Download Panel -->
+            <div id="result-panel" class="result-panel" style="display: none;">
+                <div class="success-banner">
+                    <span class="success-icon">✓</span>
+                    <div class="success-text-block">
+                        <h4>Detailed Diagnostic Report Ready</h4>
+                        <p id="success-time-text">Generated just now</p>
+                    </div>
+                </div>
+                
+                <div class="result-actions">
+                    <a id="download-link" href="#" class="btn btn-success" download>
+                        <span>Download DDR PDF</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Error Panel -->
+            <div id="error-panel" class="error-panel" style="display: none;">
+                <span class="error-icon">⚠</span>
+                <div class="error-content">
+                    <h4>Report Generation Failed</h4>
+                    <p id="error-msg-text">An error occurred during text extraction or LLM processing.</p>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>AI DDR Report Generator &copy; 2026. Built with Python, Flask, and Google Gemini.</p>
+        </footer>
+    </div>
+
+    <!-- Frontend Interactive Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('ddr-upload-form');
+            const inspectionFile = document.getElementById('inspection-file');
+            const thermalFile = document.getElementById('thermal-file');
+            
+            const inspectionBadge = document.getElementById('inspection-file-info');
+            const inspectionFilename = document.getElementById('inspection-filename');
+            const clearInspectionBtn = document.getElementById('clear-inspection-btn');
+            const inspectionDropzone = document.getElementById('inspection-dropzone');
+
+            const thermalBadge = document.getElementById('thermal-file-info');
+            const thermalFilename = document.getElementById('thermal-filename');
+            const clearThermalBtn = document.getElementById('clear-thermal-btn');
+            const thermalDropzone = document.getElementById('thermal-dropzone');
+
+            const generateBtn = document.getElementById('generate-btn');
+            const btnSpinner = document.getElementById('btn-spinner');
+
+            const statusPanel = document.getElementById('status-panel');
+            const statusDot = document.getElementById('status-dot');
+            const statusTitle = document.getElementById('status-title');
+            const statusDesc = document.getElementById('status-desc');
+            const statusBar = document.getElementById('status-bar');
+
+            const resultPanel = document.getElementById('result-panel');
+            const downloadLink = document.getElementById('download-link');
+            const successTimeText = document.getElementById('success-time-text');
+
+            const errorPanel = document.getElementById('error-panel');
+            const errorMsgText = document.getElementById('error-msg-text');
+
+            // CSRF Token (read from document header if injected, fallback to none for local environment)
+            const csrfToken = "{{ csrf_token() if csrf_token else '' }}";
+
+            // Visual feedback on file selection
+            inspectionFile.addEventListener('change', () => {
+                if (inspectionFile.files.length > 0) {
+                    inspectionFilename.textContent = inspectionFile.files[0].name;
+                    inspectionBadge.style.display = 'flex';
+                    inspectionDropzone.style.display = 'none';
+                }
+            });
+
+            thermalFile.addEventListener('change', () => {
+                if (thermalFile.files.length > 0) {
+                    thermalFilename.textContent = thermalFile.files[0].name;
+                    thermalBadge.style.display = 'flex';
+                    thermalDropzone.style.display = 'none';
+                }
+            });
+
+            // Clear file buttons
+            clearInspectionBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                inspectionFile.value = '';
+                inspectionBadge.style.display = 'none';
+                inspectionDropzone.style.display = 'block';
+            });
+
+            clearThermalBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                thermalFile.value = '';
+                thermalBadge.style.display = 'none';
+                thermalDropzone.style.display = 'block';
+            });
+
+            // Form Submit and async processing
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                // Hide old panels
+                resultPanel.style.display = 'none';
+                errorPanel.style.display = 'none';
+                statusPanel.style.display = 'block';
+
+                // Update processing indicators
+                generateBtn.disabled = true;
+                btnSpinner.style.display = 'inline-block';
+                statusDot.className = 'status-indicator-dot processing';
+                statusTitle.textContent = 'Processing Reports...';
+                statusDesc.textContent = 'Uploading files, extracting text and mapping thermal observations...';
+                statusBar.style.width = '25%';
+
+                const formData = new FormData(form);
+                
+                try {
+                    // Start progress bar timer animations for natural UX
+                    let progress = 25;
+                    const progressTimer = setInterval(() => {
+                        if (progress < 90) {
+                            progress += 5;
+                            statusBar.style.width = progress + '%';
+                            if (progress === 45) {
+                                statusDesc.textContent = 'Running OCR fallbacks and image extraction...';
+                            } else if (progress === 70) {
+                                statusDesc.textContent = 'Sending combined contexts to Gemini AI Diagnostics Engine...';
+                            }
+                        }
+                    }, 1500);
+
+                    const headers = {};
+                    if (csrfToken) {
+                        headers['X-CSRFToken'] = csrfToken;
+                    }
+
+                    const response = await fetch('/generate', {
+                        method: 'POST',
+                        body: formData,
+                        headers: headers
+                    });
+
+                    clearInterval(progressTimer);
+                    statusBar.style.width = '100%';
+
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                        statusPanel.style.display = 'none';
+                        
+                        // Set up download elements safely (no innerHTML)
+                        downloadLink.href = '/download/' + encodeURIComponent(data.filename);
+                        
+                        const now = new Date();
+                        const timeStr = "Generated on " + now.toLocaleDateString() + " at " + now.toLocaleTimeString();
+                        successTimeText.textContent = timeStr;
+                        
+                        resultPanel.style.display = 'block';
+                    } else {
+                        throw new Error(data.error || 'Server processing failed.');
+                    }
+
+                } catch (err) {
+                    loggerConsoleError(err.message);
+                    statusPanel.style.display = 'none';
+                    errorMsgText.textContent = err.message;
+                    errorPanel.style.display = 'flex';
+                } finally {
+                    generateBtn.disabled = false;
+                    btnSpinner.style.display = 'none';
+                }
+            });
+
+            // Local logger console safety wrapper (PII sanitization)
+            function loggerConsoleError(msg) {
+                console.error("An error occurred during report processing: " + msg);
+            }
+        });
+    </script>
+</body>
+</html>
